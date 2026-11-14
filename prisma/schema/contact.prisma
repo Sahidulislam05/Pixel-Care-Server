@@ -1,0 +1,13 @@
+model ContactMessage {
+  id String @id @default(uuid())
+
+  name    String
+  email   String
+  subject String
+  message String
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt], name: "idx_contact_message_created_at")
+  @@map("contact_messages")
+}
