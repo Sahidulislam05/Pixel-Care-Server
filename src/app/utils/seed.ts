@@ -157,3 +157,41 @@ export const seedTesterDoctor = async () => {
 		console.log("Error Seeding Tester Doctor : ", error);
 	}
 };
+
+// Demo patient used by the frontend's "demo login" button.
+export const seedTesterPatient = async () => {
+	try {
+		const name = config.tester_patient_name;
+		const email = config.tester_patient_email;
+		const password = config.tester_patient_password;
+
+		if (!name || !email || !password) {
+			console.log("Tester Patient env values missing, skipping demo patient seed.");
+			return;
+		}
+
+		const isTesterPatientExist = await prisma.user.findUnique({ where: { email } });
+
+		if (isTesterPatientExist) {
+			console.log("Tester Patient Already Exists!");
+			return;
+		}
+
+		const hashedPassword = await bcrypt.hash(password, Number(config.bcrypt_salt_rounds));
+
+		const testerPatient = await prisma.user.create({
+			data: {
+				name,
+				email,
+				password: hashedPassword,
+				role: Role.PATIENT,
+				emailVerified: true,
+				patient: { create: { name, email } },
+			},
+		});
+
+		console.log("Tester Patient Created : ", testerPatient.email);
+	} catch (error) {
+		console.log("Error Seeding Tester Patient : ", error);
+	}
+};

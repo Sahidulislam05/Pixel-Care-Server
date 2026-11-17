@@ -61,7 +61,7 @@ const ChangePasswordZodSchema = z.object({
 });
 
 const GoogleLoginZodSchema = z.object({
-	idToken: z.string().min(1, "Google id token is required"),
+	idToken: z.string("Google id token is required").min(1, "Google id token is required"),
 });
 
 export const UserValidation = {

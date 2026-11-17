@@ -11,6 +11,7 @@ import {
   seedSuperAdmin,
   seedTesterAdmin,
   seedTesterDoctor,
+  seedTesterPatient,
 } from "./app/utils/seed";
 
 const PORT = Number(config.port) || 5000;
@@ -36,6 +37,7 @@ const main = async () => {
     await seedSuperAdmin();
     await seedTesterAdmin();
     await seedTesterDoctor();
+    await seedTesterPatient();
 
     deleteUnverifiedDoctors();
     reindexDoctorEmbeddings();

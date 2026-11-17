@@ -103,7 +103,7 @@ npm run index:doctors   # embed every approved doctor into pgvector for the AI a
 npm run dev
 ```
 
-On startup the server connects to PostgreSQL, Redis and SMTP, and seeds the **Super Admin**, **Tester Admin** and **Tester Doctor** accounts from `.env` if they don't exist yet. Use those accounts as demo logins.
+On startup the server connects to PostgreSQL, Redis and SMTP, and seeds the **Super Admin**, **Tester Admin**, **Tester Doctor** and **Tester Patient** accounts from `.env` if they don't exist yet. Use those accounts as demo logins.
 
 ```bash
 curl http://localhost:5000/
@@ -128,6 +128,7 @@ All variables are listed with comments in [`.env.example`](./.env.example).
 | `BCRYPT_SALT_ROUNDS` | ✅ | e.g. `10` |
 | `GOOGLE_CLIENT_ID` | ✅ | OAuth 2.0 Web client ID for Google login |
 | `SUPER_ADMIN_*`, `TESTER_ADMIN_*`, `TESTER_DOCTOR_*` | ✅ | Name / email / password of accounts seeded at startup |
+| `TESTER_PATIENT_*` | | Demo patient seeded at startup for the frontend's demo login (skipped if empty). Use a non-deliverable domain such as `.test` |
 | `REDIS_USER`, `REDIS_PASSWORD`, `REDIS_HOST`, `REDIS_PORT` | ✅ | Redis connection |
 | `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_SENDER` | ✅ | Gmail address, 16-character App Password, and "From" header |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | ✅ | Cloudinary credentials |
@@ -214,7 +215,7 @@ Legend: 🌐 public · 🧑 patient · 🩺 doctor · 🛡️ admin / super admi
 | POST | `/register` | 🌐 | Start patient registration, emails a 6-digit OTP `{ name, email, password, patient?: { contactNumber } }` |
 | POST | `/verify-email` | 🌐 | Finish registration and log in `{ email, otp }` |
 | POST | `/login` | 🌐 | `{ email, password }` |
-| POST | `/google` | 🌐 | Patient Google login `{ idToken }` |
+| POST | `/google` | 🌐 | Patient Google login `{ idToken }`. Requires a verified Google email; links to an existing patient with the same email, and refuses doctor/admin emails |
 | POST | `/refresh-token` | 🌐 | New token pair from the refresh-token cookie |
 | POST | `/logout` | 🌐 | Clear auth cookies |
 | POST | `/forgot-password` | 🌐 | Email a reset OTP `{ email }` |
@@ -279,7 +280,7 @@ Passwords need 8+ characters with upper case, lower case, a digit and a symbol.
 | Method | Path | Access | Description |
 |---|---|:---:|---|
 | GET | `/my-payments` | 🧑 | Own payments |
-| GET | `/all-payments` | 🛡️ | Filter `patientEmail` |
+| GET | `/all-payments` | 🛡️ | Filter `patientEmail`. Includes patient name and email |
 | GET | `/:paymentId` | 🧑 🛡️ | Single payment |
 
 #### Prescriptions — `/prescription`

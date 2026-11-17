@@ -396,104 +396,79 @@ const googleLogin = async (payload: IGoogleLoginPayload) => {
     );
   }
 
-  if (!googleIdTokenPayload) {
+  if (!googleIdTokenPayload?.email || !googleIdTokenPayload.sub) {
     throw new AppError(
       httpStatus.UNAUTHORIZED,
       "Invalid Or Expired Google Id Token",
     );
   }
 
-  if (!googleIdTokenPayload.email) {
-    throw new AppError(httpStatus.BAD_REQUEST, "Google Email Not Found");
-  }
-  if (!googleIdTokenPayload.name) {
+  // An unverified Google address must never be trusted to claim an account.
+  if (!googleIdTokenPayload.email_verified) {
     throw new AppError(
-      httpStatus.BAD_REQUEST,
-      "Google Email User Name Not Found",
+      httpStatus.UNAUTHORIZED,
+      "Your Google Email Is Not Verified",
     );
   }
 
-  const ifPatientExistWithGoogleAuth = await prisma.user.findUnique({
-    where: {
-      email: googleIdTokenPayload.email,
-      role: Role.PATIENT,
-      googleId: googleIdTokenPayload.sub,
-    },
-  });
+  const email = googleIdTokenPayload.email.trim().toLowerCase();
+  const googleId = googleIdTokenPayload.sub;
+  const name = googleIdTokenPayload.name?.trim() || email.split("@")[0];
 
-  let user = ifPatientExistWithGoogleAuth;
+  const existingUser = await prisma.user.findUnique({ where: { email } });
 
-  if (!ifPatientExistWithGoogleAuth) {
-    const ifPatientExistWithCredentials = await prisma.user.findUnique({
-      where: {
-        email: googleIdTokenPayload.email,
+  let user = existingUser;
+
+  if (existingUser) {
+    // Spec 2/3.3: Google sign-in is a patient-only feature.
+    if (existingUser.role !== Role.PATIENT) {
+      throw new AppError(
+        httpStatus.FORBIDDEN,
+        "Google Sign-In Is Only For Patients. Please Sign In With Your Email And Password.",
+      );
+    }
+
+    if (existingUser.googleId && existingUser.googleId !== googleId) {
+      throw new AppError(
+        httpStatus.UNAUTHORIZED,
+        "This Email Is Linked To A Different Google Account",
+      );
+    }
+
+    // Same person, registered with email/password: link their Google account.
+    if (!existingUser.googleId) {
+      user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { googleId, emailVerified: true },
+      });
+    }
+  } else {
+    user = await prisma.user.create({
+      data: {
+        name,
+        email,
         role: Role.PATIENT,
-        authProvider: AuthProvider.CREDENTIAL,
+        googleId,
+        authProvider: AuthProvider.GOOGLE,
+        emailVerified: true,
+        patient: { create: { name, email } },
       },
     });
 
-    if (ifPatientExistWithCredentials) {
-      if (!ifPatientExistWithCredentials.emailVerified) {
-        throw new AppError(httpStatus.FORBIDDEN, "Email Not Verified");
-      }
-
-      if (ifPatientExistWithCredentials.status === UserStatus.BLOCKED) {
-        throw new AppError(httpStatus.FORBIDDEN, "User Is Blocked");
-      }
-
-      if (
-        ifPatientExistWithCredentials.isDeleted ||
-        ifPatientExistWithCredentials.status === UserStatus.DELETED
-      ) {
-        throw new AppError(httpStatus.FORBIDDEN, "User Is Deleted");
-      }
-
-      user = await prisma.user.update({
-        where: {
-          id: ifPatientExistWithCredentials.id,
-        },
-
-        data: {
-          googleId: googleIdTokenPayload.sub,
-        },
-      });
-    } else {
-      // Google Register
-      user = await prisma.user.create({
-        data: {
-          name: googleIdTokenPayload.name,
-          email: googleIdTokenPayload.email,
-          role: Role.PATIENT,
-          googleId: googleIdTokenPayload.sub,
-          authProvider: AuthProvider.GOOGLE,
-          emailVerified: true,
-          patient: {
-            create: {
-              name: googleIdTokenPayload.name,
-              email: googleIdTokenPayload.email,
-            },
-          },
-        },
-      });
-      const tempatePath = path.join(
-        process.cwd(),
-        "src/app/templates/patient-welcome-email.ejs",
+    // The account exists either way; a mail outage must not fail the sign-up.
+    try {
+      const html = await ejs.renderFile(
+        path.join(process.cwd(), "src/app/templates/patient-welcome-email.ejs"),
+        { name },
       );
-
-      const templateData = {
-        name: user.name,
-      };
-
-      const html = await ejs.renderFile(tempatePath, templateData);
-
       await transporter.sendMail({
         from: config.email_sender,
-        to: user.email,
+        to: email,
         subject: "Welcome To Pixel-care System",
-        // text : `Your OTP is ${otp}`
-        // html: `<h1>Your OTP is ${otp}</h1>`
         html,
       });
+    } catch (error) {
+      console.error("Google sign-up: welcome email failed", error);
     }
   }
 
