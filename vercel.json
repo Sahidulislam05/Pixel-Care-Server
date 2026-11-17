@@ -1,8 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "prisma generate",
+  "framework": null,
+  "buildCommand": "npx prisma generate && npm run build && mkdir -p public && printf 'User-agent: *\\nDisallow: /\\n' > public/robots.txt",
+  "outputDirectory": "public",
   "functions": {
-    "api/index.ts": {
+    "api/index.js": {
       "includeFiles": "src/app/templates/**",
       "maxDuration": 30
     }

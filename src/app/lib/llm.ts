@@ -66,6 +66,9 @@ class OpenRouterEmbeddings extends Embeddings {
             input,
             encoding_format: "float",
         }),
+        // Free OpenRouter models sometimes never answer; fail fast instead of
+        // hanging until the serverless function's 30s limit kills the request.
+        signal: AbortSignal.timeout(8_000),
     })
 
     if(!response.ok){
